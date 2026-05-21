@@ -43,12 +43,19 @@ QUERY LANGUAGE
     -- -literal-name     use -- to pass a literal dash-prefixed string
 
 \b
+AUTHENTICATION
+  API key (env: TAILSCALE_API_KEY or -k/--api-key) or OAuth2 client credentials
+  (env: TAILSCALE_OAUTH_CLIENT_ID + TAILSCALE_OAUTH_CLIENT_SECRET, or
+  --oauth-client-id + --oauth-client-secret).  Tokens are obtained automatically
+  and cached for their lifetime.
+
+\b
 EXAMPLES
   query-ts 'web-*'
   query-ts 'env:production -tag:deprecated'
   query-ts --users 'admin*'
   query-ts --json 'web-* OR api-*'
-  query-ts --plain --comma 'env:prod'
+  query-ts --comma 'env:prod'
   query-ts --type=groups
 """
 
@@ -153,7 +160,7 @@ def _validate_format(ctx: click.Context, param: click.Parameter, value: str) -> 
     "--comma",
     is_flag=True,
     default=False,
-    help="Use comma separator (shorthand for --separator=,).",
+    help="Use comma separator and plain output (implies --plain).",
 )
 @click.option(
     "--field",
@@ -169,6 +176,20 @@ def _validate_format(ctx: click.Context, param: click.Parameter, value: str) -> 
     default=None,
     metavar="KEY",
     help="Tailscale API key [env: TAILSCALE_API_KEY].",
+)
+@click.option(
+    "--oauth-client-id",
+    envvar="TAILSCALE_OAUTH_CLIENT_ID",
+    default=None,
+    metavar="ID",
+    help="OAuth2 client ID [env: TAILSCALE_OAUTH_CLIENT_ID].",
+)
+@click.option(
+    "--oauth-client-secret",
+    envvar="TAILSCALE_OAUTH_CLIENT_SECRET",
+    default=None,
+    metavar="SECRET",
+    help="OAuth2 client secret [env: TAILSCALE_OAUTH_CLIENT_SECRET].",
 )
 @click.option(
     "-n",
@@ -196,6 +217,8 @@ def main(
     comma: bool,
     field: str | None,
     api_key: str | None,
+    oauth_client_id: str | None,
+    oauth_client_secret: str | None,
     tailnet: str,
     color: bool | None,
 ) -> None:
@@ -205,21 +228,42 @@ def main(
     of the selected type are listed.
     """
     resource_type = resource_type_override or resource_type
-    fmt = fmt_override or fmt or "table"
 
+    # --comma implies --plain when no explicit format was chosen
     if comma:
         separator = ","
+        fmt = fmt_override or fmt or "plain"
+    else:
+        fmt = fmt_override or fmt or "table"
 
     if color is None:
         color = sys.stdout.isatty()
 
-    if not api_key:
+    has_api_key = bool(api_key)
+    has_oauth = bool(oauth_client_id and oauth_client_secret)
+    has_partial_oauth = bool(oauth_client_id) != bool(oauth_client_secret)
+
+    if has_partial_oauth:
         raise click.UsageError(
-            "API key required. Set TAILSCALE_API_KEY or use --api-key."
+            "Both --oauth-client-id and --oauth-client-secret are required together."
+        )
+    if has_api_key and has_oauth:
+        raise click.UsageError(
+            "Provide either an API key or OAuth credentials, not both."
+        )
+    if not has_api_key and not has_oauth:
+        raise click.UsageError(
+            "Authentication required. Set TAILSCALE_API_KEY or use --api-key, "
+            "or set TAILSCALE_OAUTH_CLIENT_ID + TAILSCALE_OAUTH_CLIENT_SECRET."
         )
 
     try:
-        with TailscaleClient(api_key=api_key, tailnet=tailnet) as client:
+        with TailscaleClient(
+            api_key=api_key,
+            oauth_client_id=oauth_client_id,
+            oauth_client_secret=oauth_client_secret,
+            tailnet=tailnet,
+        ) as client:
             resources = _fetch(client, resource_type)
     except TailscaleAPIError as exc:
         raise click.ClickException(str(exc)) from exc

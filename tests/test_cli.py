@@ -36,18 +36,38 @@ def invoke(runner, args, env=None):
 
 
 class TestCLIBasic:
-    def test_no_api_key_fails(self, runner):
+    def test_no_credentials_fails(self, runner):
         result = runner.invoke(main, [], env={})
         assert result.exit_code != 0
-        assert "API key" in result.output
+        assert "Authentication required" in result.output
+
+    def test_both_credentials_fails(self, runner):
+        result = runner.invoke(
+            main,
+            ["--oauth-client-id", "id", "--oauth-client-secret", "sec"],
+            env={"TAILSCALE_API_KEY": "key"},
+        )
+        assert result.exit_code != 0
+        assert "not both" in result.output
+
+    def test_partial_oauth_fails(self, runner):
+        result = runner.invoke(
+            main,
+            ["--oauth-client-id", "id"],
+            env={},
+        )
+        assert result.exit_code != 0
+        assert "both" in result.output.lower()
 
     def test_help(self, runner):
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
         assert "QUERY LANGUAGE" in result.output
+        assert "AUTHENTICATION" in result.output
         assert "--json" in result.output
         assert "--yaml" in result.output
         assert "--plain" in result.output
+        assert "--oauth-client-id" in result.output
 
     def test_short_help(self, runner):
         result = runner.invoke(main, ["-h"])
@@ -151,7 +171,18 @@ class TestCLIOutputFormats:
             result = invoke(runner, ["-f", "xml"])
         assert result.exit_code != 0
 
-    def test_comma_flag(self, runner, mock_client, devices):
+    def test_comma_flag_implies_plain(self, runner, mock_client, devices):
+        # --comma alone (no -p) should produce plain comma-separated output
+        cm, client = mock_client
+        with patch("query_ts.cli.TailscaleClient", return_value=cm):
+            result = invoke(runner, ["-c"])
+        assert result.exit_code == 0
+        assert "," in result.output
+        assert "\n" not in result.output.rstrip()
+        # No rich table elements
+        assert "╭" not in result.output
+
+    def test_comma_flag_with_explicit_plain(self, runner, mock_client, devices):
         cm, client = mock_client
         with patch("query_ts.cli.TailscaleClient", return_value=cm):
             result = invoke(runner, ["-p", "-c"])
@@ -250,12 +281,66 @@ class TestCLIAuth:
         assert call_kwargs.kwargs["tailnet"] == "my-tailnet.com"
 
 
+class TestCLIAuthOAuth:
+    def test_oauth_flags(self, runner, mock_client, devices):
+        cm, client = mock_client
+        with patch("query_ts.cli.TailscaleClient", return_value=cm) as mock_cls:
+            result = runner.invoke(
+                main,
+                ["--oauth-client-id", "my-id", "--oauth-client-secret", "my-secret", "--no-color"],
+                env={},
+                catch_exceptions=False,
+            )
+        assert result.exit_code == 0
+        call_kwargs = mock_cls.call_args.kwargs
+        assert call_kwargs["oauth_client_id"] == "my-id"
+        assert call_kwargs["oauth_client_secret"] == "my-secret"
+        assert call_kwargs["api_key"] is None
+
+    def test_oauth_from_env(self, runner, mock_client, devices):
+        cm, client = mock_client
+        with patch("query_ts.cli.TailscaleClient", return_value=cm) as mock_cls:
+            result = runner.invoke(
+                main,
+                ["--no-color"],
+                env={
+                    "TAILSCALE_OAUTH_CLIENT_ID": "env-id",
+                    "TAILSCALE_OAUTH_CLIENT_SECRET": "env-secret",
+                },
+                catch_exceptions=False,
+            )
+        assert result.exit_code == 0
+        call_kwargs = mock_cls.call_args.kwargs
+        assert call_kwargs["oauth_client_id"] == "env-id"
+        assert call_kwargs["oauth_client_secret"] == "env-secret"
+
+    def test_partial_oauth_env_fails(self, runner, mock_client):
+        result = runner.invoke(
+            main,
+            ["--no-color"],
+            env={"TAILSCALE_OAUTH_CLIENT_ID": "only-id"},
+        )
+        assert result.exit_code != 0
+        assert "both" in result.output.lower()
+
+    def test_oauth_and_api_key_env_fails(self, runner, mock_client):
+        result = runner.invoke(
+            main,
+            ["--no-color"],
+            env={
+                "TAILSCALE_API_KEY": "key",
+                "TAILSCALE_OAUTH_CLIENT_ID": "id",
+                "TAILSCALE_OAUTH_CLIENT_SECRET": "secret",
+            },
+        )
+        assert result.exit_code != 0
+        assert "not both" in result.output
+
+
 class TestCLIErrors:
     def test_api_error_shown(self, runner):
         cm = MagicMock()
-        cm.__enter__ = MagicMock(
-            side_effect=TailscaleAPIError(401, "Unauthorized")
-        )
+        cm.__enter__ = MagicMock(side_effect=TailscaleAPIError(401, "Unauthorized"))
         cm.__exit__ = MagicMock(return_value=False)
         with patch("query_ts.cli.TailscaleClient", return_value=cm):
             result = invoke(runner, ["--no-color"])
