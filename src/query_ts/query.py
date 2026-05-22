@@ -300,67 +300,85 @@ def _match_tag_pattern(pattern: TagPattern, tags: list[str]) -> bool:
     return any(_fnmatch(t, target) for t in tags)
 
 
-def _match_node(node: Node, names: list[str], tags: list[str]) -> bool:
+def _walk(node: Node, match_leaf) -> bool:
+    """Evaluate the boolean tree, delegating term nodes to match_leaf."""
     if isinstance(node, AndNode):
-        return _match_node(node.left, names, tags) and _match_node(
-            node.right, names, tags
-        )
+        return _walk(node.left, match_leaf) and _walk(node.right, match_leaf)
     if isinstance(node, OrNode):
-        return _match_node(node.left, names, tags) or _match_node(
-            node.right, names, tags
-        )
+        return _walk(node.left, match_leaf) or _walk(node.right, match_leaf)
     if isinstance(node, NotNode):
-        return not _match_node(node.operand, names, tags)
-    if isinstance(node, NamePattern):
-        return _match_name_pattern(node, names)
-    if isinstance(node, TagPattern):
-        return _match_tag_pattern(node, tags)
-    raise TypeError(f"Unknown node type: {type(node)}")
+        return not _walk(node.operand, match_leaf)
+    return match_leaf(node)
+
+
+def _leaf_matcher(
+    names: list[str], tags: list[str], colon_targets: tuple[str, ...] = ()
+):
+    """Build a term matcher closing over a resource's names and tags.
+
+    colon_targets lets a 'prefix:suffix' query also match a colon-form name
+    directly (e.g. 'svc:web' or 'group:admins'), not just a hyphenated tag.
+    """
+
+    def match_leaf(node: Node) -> bool:
+        if isinstance(node, NamePattern):
+            return _match_name_pattern(node, names)
+        if isinstance(node, TagPattern):
+            colon_form = f"{node.prefix}:{node.suffix}"
+            if any(_fnmatch(t, colon_form) for t in colon_targets):
+                return True
+            return _match_tag_pattern(node, tags)
+        raise TypeError(f"Unknown node type: {type(node)}")
+
+    return match_leaf
 
 
 def matches_device(node: Node, resource: dict) -> bool:
-    return _match_node(node, _device_names(resource), _device_tags(resource))
+    return _walk(node, _leaf_matcher(_device_names(resource), _device_tags(resource)))
 
 
 def matches_user(node: Node, resource: dict) -> bool:
-    return _match_node(node, _user_names(resource), _user_tags(resource))
-
-
-def _match_group_node(node: Node, resource: dict) -> bool:
-    """Group-aware node matching that handles 'group:name' colon-form queries."""
-    if isinstance(node, AndNode):
-        return _match_group_node(node.left, resource) and _match_group_node(node.right, resource)
-    if isinstance(node, OrNode):
-        return _match_group_node(node.left, resource) or _match_group_node(node.right, resource)
-    if isinstance(node, NotNode):
-        return not _match_group_node(node.operand, resource)
-    if isinstance(node, NamePattern):
-        return _match_name_pattern(node, _group_names(resource))
-    if isinstance(node, TagPattern):
-        # 'group:admins' should match a group whose name is 'group:admins'
-        colon_form = f"{node.prefix}:{node.suffix}"
-        name = resource.get("name", "")
-        if _fnmatch(name, colon_form):
-            return True
-        # Also match against non-group member entries (tags/users in member list)
-        members = resource.get("members", [])
-        tags = [m for m in members if not m.startswith("group:")]
-        return _match_tag_pattern(node, tags)
-    raise TypeError(f"Unknown node type: {type(node)}")
+    return _walk(node, _leaf_matcher(_user_names(resource), _user_tags(resource)))
 
 
 def matches_group(node: Node, resource: dict) -> bool:
-    return _match_group_node(node, resource)
+    members = resource.get("members") or []
+    member_tags = [m for m in members if not m.startswith("group:")]
+    return _walk(
+        node,
+        _leaf_matcher(
+            _group_names(resource),
+            member_tags,
+            colon_targets=(resource.get("name", ""),),
+        ),
+    )
+
+
+def _service_names(service: dict) -> list[str]:
+    names = []
+    name = service.get("name", "")
+    if name:
+        names.append(name)
+        if name.startswith("svc:"):
+            names.append(name[4:])
+    names.extend(service.get("addrs") or [])
+    return names
+
+
+def _service_tags(service: dict) -> list[str]:
+    raw = service.get("tags") or []
+    return [t[4:] if t.startswith("tag:") else t for t in raw]
 
 
 def matches_service(node: Node, resource: dict) -> bool:
-    names = [
-        resource.get("proto", ""),
-        resource.get("device", ""),
-        f"{resource.get('device', '')}:{resource.get('port', '')}",
-    ]
-    names = [n for n in names if n]
-    return _match_node(node, names, [])
+    return _walk(
+        node,
+        _leaf_matcher(
+            _service_names(resource),
+            _service_tags(resource),
+            colon_targets=(resource.get("name", ""),),
+        ),
+    )
 
 
 _MATCHERS = {

@@ -144,18 +144,8 @@ class TailscaleClient:
         return [{"name": k, "members": v} for k, v in groups.items()]
 
     def get_services(self) -> list[dict]:
-        devices = self.get_devices()
-        services: list[dict] = []
-        for device in devices:
-            for svc in device.get("services", []) or []:
-                services.append(
-                    {
-                        "device": device.get("hostname", device.get("name", "")),
-                        "device_id": device.get("id", ""),
-                        **svc,
-                    }
-                )
-        return services
+        data = self._request("GET", f"/tailnet/{self.tailnet}/services")
+        return data.get("vipServices", [])
 
     def close(self) -> None:
         self._client.close()

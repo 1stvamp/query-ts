@@ -101,3 +101,23 @@ def groups():
         {"name": "group:devs", "members": ["bob@example.com", "alice@example.com"]},
         {"name": "group:ops", "members": ["carol@example.com"]},
     ]
+
+
+@pytest.fixture
+def services():
+    return [
+        {
+            "name": "svc:web",
+            "addrs": ["100.93.49.180", "fd7a:115c:a1e0::3456:3cb4"],
+            "comment": "Public web service",
+            "ports": ["tcp:80", "tcp:443"],
+            "tags": ["tag:env-production"],
+        },
+        {
+            "name": "svc:api",
+            "addrs": ["100.93.49.181"],
+            "comment": "Internal API",
+            "ports": ["tcp:8080"],
+            "tags": ["tag:env-staging"],
+        },
+    ]

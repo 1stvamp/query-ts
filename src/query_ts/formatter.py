@@ -53,7 +53,7 @@ _PLAIN_FIELDS: dict[str, list[str]] = {
     "devices": ["hostname", "name"],
     "users": ["loginName", "displayName", "name"],
     "groups": ["name"],
-    "services": ["proto", "device"],
+    "services": ["name"],
     "acl": ["name"],
 }
 
@@ -167,17 +167,19 @@ class TableFormatter(Formatter):
 
     def _fmt_services(self, services: list[dict]) -> str:
         table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
-        table.add_column("Device", style="bold green", no_wrap=True)
-        table.add_column("Protocol")
-        table.add_column("Port")
-        table.add_column("Description")
+        table.add_column("Name", style="bold green", no_wrap=True)
+        table.add_column("Addresses")
+        table.add_column("Ports")
+        table.add_column("Tags")
+        table.add_column("Comment")
 
         for s in services:
-            device = s.get("device", "")
-            proto = s.get("proto", "")
-            port = str(s.get("port", ""))
-            desc = s.get("description", "")
-            table.add_row(device, proto, port, desc)
+            name = s.get("name", "")
+            addrs = ", ".join(s.get("addrs") or [])
+            ports = ", ".join(s.get("ports") or [])
+            tags = _tag_str(s.get("tags"))
+            comment = s.get("comment", "")
+            table.add_row(name, addrs, ports, tags, comment)
 
         return self._render(table)
 

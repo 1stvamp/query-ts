@@ -20,7 +20,7 @@ def client():
 
 
 # ---------------------------------------------------------------------------
-# TailscaleClient — API key auth
+# TailscaleClient: API key auth
 # ---------------------------------------------------------------------------
 
 
@@ -100,31 +100,28 @@ class TestTailscaleClient:
     @respx.mock
     def test_get_services(self, client):
         payload = {
-            "devices": [
+            "vipServices": [
                 {
-                    "id": "1",
-                    "hostname": "web-1",
-                    "services": [
-                        {"proto": "tcp", "port": 80, "description": "HTTP"}
-                    ],
+                    "name": "svc:example",
+                    "addrs": ["100.93.49.180", "fd7a:115c:a1e0::3456:3cb4"],
+                    "comment": "Example Service",
+                    "ports": ["tcp:80", "tcp:443"],
+                    "tags": ["tag:example"],
                 }
             ]
         }
-        respx.get(f"{BASE}/tailnet/{TAILNET}/devices").mock(
+        respx.get(f"{BASE}/tailnet/{TAILNET}/services").mock(
             return_value=httpx.Response(200, json=payload)
         )
         services = client.get_services()
         assert len(services) == 1
-        assert services[0]["device"] == "web-1"
-        assert services[0]["proto"] == "tcp"
+        assert services[0]["name"] == "svc:example"
+        assert services[0]["ports"] == ["tcp:80", "tcp:443"]
 
     @respx.mock
     def test_get_services_no_services(self, client):
-        payload = {
-            "devices": [{"id": "1", "hostname": "web-1", "services": None}]
-        }
-        respx.get(f"{BASE}/tailnet/{TAILNET}/devices").mock(
-            return_value=httpx.Response(200, json=payload)
+        respx.get(f"{BASE}/tailnet/{TAILNET}/services").mock(
+            return_value=httpx.Response(200, json={})
         )
         assert client.get_services() == []
 
@@ -281,7 +278,7 @@ class TestOAuthTokenManager:
 
 
 # ---------------------------------------------------------------------------
-# TailscaleClient — OAuth auth
+# TailscaleClient: OAuth auth
 # ---------------------------------------------------------------------------
 
 

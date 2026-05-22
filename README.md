@@ -31,7 +31,7 @@ This installs a `query-ts` command. It requires Python 3.11+.
 
 ## Authentication
 
-Provide **either** an API key **or** OAuth2 client credentials — not both. One
+Provide **either** an API key **or** OAuth2 client credentials, not both. One
 of the two is required; the CLI exits with an error if no credentials are given.
 
 ### API key
@@ -112,14 +112,14 @@ expands to the tag `prefix-suffix`:
 | --- | --- |
 | `tag:env-prod` | `env-prod` |
 | `env:prod` | `env-prod` (same as above) |
-| `env:prod*` | `env-prod`, `env-production`, … (glob on the suffix) |
+| `env:prod*` | `env-prod`, `env-production`, etc. (glob on the suffix) |
 
 ### Logical operators
 
 | Expression | Meaning |
 | --- | --- |
 | `web AND env:prod` | both conditions (`AND` is the default) |
-| `web env:prod` | implicit `AND` — same as above |
+| `web env:prod` | implicit `AND` (same as above) |
 | `web OR env:prod` | either condition |
 | `(web OR api) env:prod` | parentheses for precedence |
 
@@ -151,7 +151,7 @@ query-ts -- -web-*          # exclude names matching web-*
 | `--devices` | Query devices (default) |
 | `--users` | Query users |
 | `--groups` | Query ACL groups |
-| `--services` | Query services exposed by devices |
+| `--services` | Query Tailscale Services |
 | `--acl` | Query ACL rules |
 | `-t, --type TYPE` | Resource type: `devices`, `users`, `groups`, `services`, `acl` |
 
@@ -174,8 +174,8 @@ The default format is a coloured `table`.
 | `-c, --comma` | Use a comma separator; selects plain output unless a format is set explicitly |
 | `--field FIELD` | Field to extract in plain output (e.g. `name`, `id`) |
 
-These options only affect `plain` output. When `--field` is omitted, a sensible
-default is chosen per resource type (e.g. hostname for devices, login for users).
+These options only affect `plain` output. When `--field` is omitted, a default
+is chosen per resource type (hostname for devices, login for users).
 
 ### Connection & authentication
 

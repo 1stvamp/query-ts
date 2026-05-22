@@ -14,6 +14,7 @@ from query_ts.query import (
     filter_resources,
     matches_device,
     matches_group,
+    matches_service,
     matches_user,
     parse_query,
     tokenize,
@@ -402,3 +403,37 @@ class TestMatchGroup:
     def test_no_match(self):
         g = {"name": "group:devs", "members": []}
         assert not matches_group(parse_query("admins"), g)
+
+
+# ---------------------------------------------------------------------------
+# Service matching
+# ---------------------------------------------------------------------------
+
+
+class TestMatchService:
+    def _svc(self):
+        return {
+            "name": "svc:web",
+            "addrs": ["100.93.49.180"],
+            "ports": ["tcp:443"],
+            "tags": ["tag:env-production"],
+        }
+
+    def test_full_name(self):
+        assert matches_service(parse_query("svc:web"), self._svc())
+
+    def test_short_name(self):
+        assert matches_service(parse_query("web"), self._svc())
+
+    def test_name_glob(self):
+        assert matches_service(parse_query("svc:w*"), self._svc())
+
+    def test_address_match(self):
+        assert matches_service(parse_query("100.93.49.180"), self._svc())
+
+    def test_tag_match(self):
+        assert matches_service(parse_query("tag:env-production"), self._svc())
+        assert matches_service(parse_query("env:production"), self._svc())
+
+    def test_no_match(self):
+        assert not matches_service(parse_query("db"), self._svc())

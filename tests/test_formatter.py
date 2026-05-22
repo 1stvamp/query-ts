@@ -117,11 +117,14 @@ class TestTableFormatter:
         output = TableFormatter(color=False).format(groups, "groups")
         assert "group:admins" in output
 
-    def test_services_format(self):
-        services = [{"device": "web-1", "proto": "tcp", "port": 80, "description": "HTTP"}]
+    def test_services_format(self, services):
         output = TableFormatter(color=False).format(services, "services")
-        assert "web-1" in output
-        assert "tcp" in output
+        assert "svc:web" in output
+        assert "tcp:443" in output
+        assert "100.93.49.180" in output
+        # tags are shown with the "tag:" prefix stripped
+        assert "env-production" in output
+        assert "tag:env-production" not in output
 
     def test_acl_format(self):
         # cli._fetch flattens the ACL into name/value items

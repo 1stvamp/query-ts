@@ -92,7 +92,7 @@ def _validate_format(ctx: click.Context, param: click.Parameter, value: str) -> 
     "--services",
     "resource_type",
     flag_value="services",
-    help="Query services exposed by devices.",
+    help="Query Tailscale Services.",
 )
 @click.option(
     "--groups",
