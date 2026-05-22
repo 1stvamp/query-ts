@@ -123,6 +123,22 @@ class TestTableFormatter:
         assert "web-1" in output
         assert "tcp" in output
 
+    def test_acl_format(self):
+        # cli._fetch flattens the ACL into name/value items
+        acl_items = [
+            {"name": "acls", "value": [{"action": "accept"}]},
+            {"name": "tagOwners", "value": {"tag:prod": ["group:admins"]}},
+        ]
+        output = TableFormatter(color=False).format(acl_items, "acl")
+        # The ACL keys appear in the Key column...
+        assert "acls" in output
+        assert "tagOwners" in output
+        # ...and the literal "name"/"value" dict keys do not leak into output.
+        rows = [line for line in output.splitlines() if "│" in line]
+        key_cells = [line.split("│")[1].strip() for line in rows]
+        assert "name" not in key_cells
+        assert "value" not in key_cells
+
     def test_tags_strip_tag_prefix(self, devices):
         output = TableFormatter(color=False).format(devices[:1], "devices")
         # "tag:env-production" should appear as "env-production"

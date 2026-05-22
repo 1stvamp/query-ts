@@ -187,8 +187,9 @@ class TableFormatter(Formatter):
         table.add_column("Value")
 
         for item in acl_items:
-            for k, v in item.items():
-                table.add_row(str(k), json.dumps(v, default=str))
+            table.add_row(
+                str(item.get("name", "")), json.dumps(item.get("value"), default=str)
+            )
 
         return self._render(table)
 
