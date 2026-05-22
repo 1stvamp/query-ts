@@ -5,9 +5,21 @@ description = "CLI for querying the Tailscale API"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
+authors = [{ name = "Wes Mason" }]
 keywords = ["tailscale", "cli", "networking"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Networking",
+    "Topic :: Utilities",
 ]
 dependencies = [
     "click>=8.1",
@@ -20,7 +32,9 @@ dependencies = [
 query-ts = "query_ts.cli:main"
 
 [project.urls]
+Homepage = "https://github.com/1stvamp/query-ts"
 Repository = "https://github.com/1stvamp/query-ts"
+Issues = "https://github.com/1stvamp/query-ts/issues"
 
 [build-system]
 requires = ["hatchling"]
