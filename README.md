@@ -31,7 +31,8 @@ This installs a `query-ts` command. It requires Python 3.11+.
 
 ## Authentication
 
-Provide **either** an API key **or** OAuth2 client credentials — not both.
+Provide **either** an API key **or** OAuth2 client credentials — not both. One
+of the two is required; the CLI exits with an error if no credentials are given.
 
 ### API key
 
@@ -133,11 +134,12 @@ query-ts '-web-*'            # exclude names matching web-*
 query-ts '-tag:env-prod'     # exclude tagged resources
 ```
 
-To search for a literal string that begins with a dash, separate it with `--`
-so your shell and the CLI treat it as a value rather than an option:
+A query that begins with `-` (such as a negation) would otherwise be mistaken
+for a command-line option. Use `--` to stop option parsing and pass it as the
+query:
 
 ```sh
-query-ts -- -literal-name
+query-ts -- -web-*          # exclude names matching web-*
 ```
 
 ## Options
@@ -148,8 +150,8 @@ query-ts -- -literal-name
 | --- | --- |
 | `--devices` | Query devices (default) |
 | `--users` | Query users |
-| `--services` | Query services exposed by devices |
 | `--groups` | Query ACL groups |
+| `--services` | Query services exposed by devices |
 | `--acl` | Query ACL rules |
 | `-t, --type TYPE` | Resource type: `devices`, `users`, `groups`, `services`, `acl` |
 
@@ -169,8 +171,11 @@ The default format is a coloured `table`.
 | Flag | Description |
 | --- | --- |
 | `-s, --separator SEP` | Field separator for plain output (default: newline) |
-| `-c, --comma` | Use a comma separator and plain output (implies `--plain`) |
+| `-c, --comma` | Use a comma separator; selects plain output unless a format is set explicitly |
 | `--field FIELD` | Field to extract in plain output (e.g. `name`, `id`) |
+
+These options only affect `plain` output. When `--field` is omitted, a sensible
+default is chosen per resource type (e.g. hostname for devices, login for users).
 
 ### Connection & authentication
 
@@ -204,4 +209,4 @@ HTTP API, so no real credentials or network access are required.
 
 ## License
 
-[MIT](LICENSE)
+[Apache-2.0](LICENSE)
