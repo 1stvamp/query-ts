@@ -1,0 +1,30 @@
+name: query-ts
+base: core24
+adopt-info: query-ts
+summary: CLI for querying the Tailscale API
+description: |
+  query-ts is a command-line tool for querying the Tailscale API. List and
+  filter devices, users, groups, services, and ACLs using a small,
+  glob-friendly query language, and render the results as a table, JSON,
+  YAML, or plain text.
+
+  Authenticate with a Tailscale API key (TAILSCALE_API_KEY) or OAuth2
+  client credentials.
+license: Apache-2.0
+grade: stable
+confinement: strict
+
+apps:
+  query-ts:
+    command: bin/query-ts
+    plugs:
+      - network
+
+parts:
+  query-ts:
+    plugin: python
+    source: .
+    override-pull: |
+      craftctl default
+      version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+      craftctl set version="$version"
