@@ -17,17 +17,24 @@ plain text.
 
 ## Installation
 
-The project is managed with [uv](https://docs.astral.sh/uv/).
+Install from PyPI with your tool of choice:
 
 ```sh
-# Run straight from a checkout without installing
-uv run query-ts --help
-
-# Or install the CLI into the active environment
-uv pip install .
+pip install query-ts
+# or, to install as an isolated tool:
+uv tool install query-ts
+# or:
+pipx install query-ts
 ```
 
-This installs a `query-ts` command. It requires Python 3.11+.
+This installs a `query-ts` command and requires Python 3.11+.
+
+To run from a checkout instead (the project is managed with
+[uv](https://docs.astral.sh/uv/)):
+
+```sh
+uv run query-ts --help
+```
 
 ## Authentication
 
