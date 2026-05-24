@@ -17,7 +17,13 @@ plain text.
 
 ## Installation
 
-Install from PyPI with your tool of choice:
+Install with Homebrew:
+
+```sh
+brew install 1stvamp/tap/query-ts
+```
+
+Or from PyPI with your tool of choice:
 
 ```sh
 pip install query-ts
