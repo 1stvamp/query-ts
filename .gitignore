@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Snap build artifacts
+*.snap
+
+# Claude Code
+.claude/

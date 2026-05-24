@@ -7,7 +7,7 @@ API). The version is read from `pyproject.toml` at build time.
 ## Building locally
 
 ```sh
-snapcraft
+snapcraft pack
 sudo snap install ./query-ts_*.snap --dangerous
 ```
 

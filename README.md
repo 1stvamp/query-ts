@@ -23,6 +23,12 @@ Install with Homebrew:
 brew install 1stvamp/tap/query-ts
 ```
 
+Or with snap:
+
+```sh
+sudo snap install query-ts
+```
+
 Or from PyPI with your tool of choice:
 
 ```sh
