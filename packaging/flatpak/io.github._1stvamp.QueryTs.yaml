@@ -1,0 +1,29 @@
+app-id: io.github._1stvamp.QueryTs
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: query-ts
+
+finish-args:
+  # query-ts talks to the Tailscale API over HTTPS.
+  - --share=network
+
+cleanup:
+  - /lib/python*/site-packages/pip*
+  - /lib/python*/site-packages/setuptools*
+
+modules:
+  # Python dependencies (including the hatchling build backend), vendored as
+  # offline sources. Generate/refresh this file with:
+  #   flatpak-pip-generator --runtime=org.freedesktop.Sdk//24.08 \
+  #     --output python3-deps hatchling click httpx rich pyyaml
+  # (the CI workflow regenerates it on each build).
+  - python3-deps.json
+
+  - name: query-ts
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --no-build-isolation --prefix=${FLATPAK_DEST} .
+    sources:
+      - type: dir
+        path: ../..

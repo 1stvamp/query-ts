@@ -1,0 +1,39 @@
+name: Flatpak
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:freedesktop-24.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Python dependency sources
+        working-directory: packaging/flatpak
+        run: |
+          pip3 install --quiet requirements-parser
+          curl -sSL -o flatpak-pip-generator \
+            https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/pip/flatpak-pip-generator
+          python3 flatpak-pip-generator --runtime=org.freedesktop.Sdk//24.08 \
+            --output python3-deps hatchling click httpx rich pyyaml
+
+      - name: Build Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: query-ts.flatpak
+          manifest-path: packaging/flatpak/io.github._1stvamp.QueryTs.yaml
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Attach Flatpak bundle to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: query-ts.flatpak
