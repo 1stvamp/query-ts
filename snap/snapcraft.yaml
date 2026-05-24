@@ -1,7 +1,12 @@
 name: query-ts
+title: query-ts
 base: core24
 adopt-info: query-ts
 summary: CLI for querying the Tailscale API
+contact: https://github.com/1stvamp/query-ts/issues
+issues: https://github.com/1stvamp/query-ts/issues
+source-code: https://github.com/1stvamp/query-ts
+website: https://github.com/1stvamp/query-ts
 description: |
   query-ts is a command-line tool for querying the Tailscale API. List and
   filter devices, users, groups, services, and ACLs using a small,
