@@ -19,7 +19,7 @@ jobs:
       - name: Generate Python dependency sources
         working-directory: packaging/flatpak
         run: |
-          pip3 install --quiet requirements-parser
+          python3 -m pip install --quiet requirements-parser
           curl -sSL -o flatpak-pip-generator \
             https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/pip/flatpak-pip-generator
           python3 flatpak-pip-generator --runtime=org.freedesktop.Sdk//24.08 \
