@@ -22,9 +22,10 @@ jobs:
           # The flatpak-builder container ships python3 without pip; bootstrap it.
           python3 -m ensurepip --upgrade 2>/dev/null || dnf -y install python3-pip
           python3 -m pip install --quiet requirements-parser
-          curl -sSL -o flatpak-pip-generator \
-            https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/pip/flatpak-pip-generator
-          python3 flatpak-pip-generator --runtime=org.freedesktop.Sdk//24.08 \
+          # Upstream renamed the script; the old name is now a symlink.
+          curl -sSL -o flatpak-pip-generator.py \
+            https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/pip/flatpak-pip-generator.py
+          python3 flatpak-pip-generator.py --runtime=org.freedesktop.Sdk//24.08 \
             --output python3-deps hatchling click httpx rich pyyaml
 
       - name: Build Flatpak bundle
