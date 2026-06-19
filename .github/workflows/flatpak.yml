@@ -19,6 +19,8 @@ jobs:
       - name: Generate Python dependency sources
         working-directory: packaging/flatpak
         run: |
+          # The flatpak-builder container ships python3 without pip; bootstrap it.
+          python3 -m ensurepip --upgrade 2>/dev/null || dnf -y install python3-pip
           python3 -m pip install --quiet requirements-parser
           curl -sSL -o flatpak-pip-generator \
             https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/pip/flatpak-pip-generator
