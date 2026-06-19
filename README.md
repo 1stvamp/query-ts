@@ -211,6 +211,7 @@ is chosen per resource type (hostname for devices, login for users).
 | --- | --- |
 | `--color / --no-color` | Force or disable colour output (auto-detected by default) |
 | `--show COLS` | Comma-separated table columns to always show in full (e.g. `--show last-seen,tags`) |
+| `--online-window MINUTES` | Minutes since last seen to still count a device as online (default: 5; env: `QUERY_TS_ONLINE_WINDOW`) |
 | `--version` | Show the version and exit |
 | `-h, --help` | Show help and exit |
 
@@ -227,6 +228,12 @@ coloured dot in the `Online` column. Use `--show last-seen` to add the timestamp
 column, or name any columns you always want kept in full, e.g.
 `--show ip,tags,last-seen`. Columns passed to `--show` are exempt from the
 automatic dropping and shortening.
+
+A device counts as online if it holds a live connection to the Tailscale control
+server, or if it was last seen within the `--online-window` (default 5 minutes).
+The Tailscale API has no plain online flag, and idle-but-reachable devices (phones
+in particular) drop the control connection, so widen the window if such devices
+read as offline, e.g. `--online-window 15`.
 
 ## Development
 

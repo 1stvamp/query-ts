@@ -8,7 +8,11 @@ import sys
 import click
 
 from .api import TailscaleAPIError, TailscaleClient
-from .formatter import FORMAT_NAMES, make_formatter
+from .formatter import (
+    DEFAULT_ONLINE_WINDOW_MINUTES,
+    FORMAT_NAMES,
+    make_formatter,
+)
 from .query import ParseError, filter_resources
 
 RESOURCE_TYPES = ("devices", "users", "groups", "services", "acl")
@@ -179,6 +183,19 @@ def _validate_format(ctx: click.Context, param: click.Parameter, value: str) -> 
         "named ones from automatic column-dropping and value-shortening."
     ),
 )
+@click.option(
+    "--online-window",
+    "online_window",
+    type=int,
+    default=DEFAULT_ONLINE_WINDOW_MINUTES,
+    show_default=True,
+    metavar="MINUTES",
+    envvar="QUERY_TS_ONLINE_WINDOW",
+    help=(
+        "Minutes since a device was last seen to still count as online in the "
+        "table (env: QUERY_TS_ONLINE_WINDOW)."
+    ),
+)
 # --- connection / auth ---
 @click.option(
     "-k",
@@ -228,6 +245,7 @@ def main(
     comma: bool,
     field: str | None,
     show_columns: str,
+    online_window: int,
     api_key: str | None,
     oauth_client_id: str | None,
     oauth_client_secret: str | None,
@@ -287,7 +305,12 @@ def main(
 
     show = {tok for tok in show_columns.split(",") if tok.strip()}
     formatter = make_formatter(
-        fmt, separator=separator, field=field, color=color, show=show
+        fmt,
+        separator=separator,
+        field=field,
+        color=color,
+        show=show,
+        online_window_minutes=online_window,
     )
     output = formatter.format(results, resource_type)
     if output:

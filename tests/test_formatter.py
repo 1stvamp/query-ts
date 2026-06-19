@@ -100,6 +100,30 @@ class TestTableFormatter:
         # online / offline indicators
         assert "●" in output or "○" in output
 
+    def test_online_indicator_uses_last_seen_window(self):
+        from datetime import datetime, timedelta, timezone
+
+        recent = (datetime.now(timezone.utc) - timedelta(minutes=3)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        stale = (datetime.now(timezone.utc) - timedelta(minutes=10)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        # Seen 3 min ago is online under the default 5-min window; 10 min is not.
+        assert "●" in TableFormatter(color=False).format(
+            [{"hostname": "r", "connectedToControl": False, "lastSeen": recent}],
+            "devices",
+        )
+        assert "●" not in TableFormatter(color=False).format(
+            [{"hostname": "s", "connectedToControl": False, "lastSeen": stale}],
+            "devices",
+        )
+        # Widening the window brings the 10-min device back online.
+        assert "●" in TableFormatter(color=False, online_window_minutes=15).format(
+            [{"hostname": "s", "connectedToControl": False, "lastSeen": stale}],
+            "devices",
+        )
+
     def test_online_indicator_uses_connected_to_control(self):
         # The Tailscale API exposes online state as ``connectedToControl``.
         online = TableFormatter(color=False).format(

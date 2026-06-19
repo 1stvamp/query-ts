@@ -4,6 +4,7 @@ import json
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from typing import Any
 
@@ -87,6 +88,26 @@ class PlainFormatter(Formatter):
 
 def _short_ts(ts: str) -> str:
     return ts[:16].replace("T", " ") if ts else ""
+
+
+# A device counts as online if it holds a live control connection, or was seen
+# within this window. The Tailscale API has no plain "online" field, and
+# connectedToControl is false for idle-but-reachable nodes (e.g. phones), so
+# recency of lastSeen is the practical signal.
+DEFAULT_ONLINE_WINDOW_MINUTES = 5
+
+
+def _is_online(device: dict, window: timedelta) -> bool:
+    if device.get("connectedToControl"):
+        return True
+    last_seen = device.get("lastSeen")
+    if not last_seen:
+        return False
+    try:
+        seen = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return datetime.now(timezone.utc) - seen < window
 
 
 def _tag_list(tags: list | None) -> list[str]:
@@ -175,10 +196,12 @@ class TableFormatter(Formatter):
         color: bool = True,
         width: int | None = None,
         show: set[str] | None = None,
+        online_window_minutes: int = DEFAULT_ONLINE_WINDOW_MINUTES,
     ) -> None:
         self.color = color
         self.width = width if width is not None else _term_width()
         self.forced = _norm_show(show)
+        self.online_window = timedelta(minutes=online_window_minutes)
 
     def _console(self) -> tuple[Console, StringIO]:
         buf = StringIO()
@@ -303,7 +326,7 @@ class TableFormatter(Formatter):
                 "online",
                 "Online",
                 lambda d: Text("●", style="green")
-                if d.get("connectedToControl", False)
+                if _is_online(d, self.online_window)
                 else Text("○", style="red"),
                 justify="center",
                 droppable=False,
@@ -457,6 +480,7 @@ def make_formatter(
     color: bool = True,
     width: int | None = None,
     show: set[str] | None = None,
+    online_window_minutes: int = DEFAULT_ONLINE_WINDOW_MINUTES,
 ) -> Formatter:
     match fmt:
         case "json":
@@ -466,4 +490,9 @@ def make_formatter(
         case "plain":
             return PlainFormatter(separator=separator, field=field)
         case _:
-            return TableFormatter(color=color, width=width, show=show)
+            return TableFormatter(
+                color=color,
+                width=width,
+                show=show,
+                online_window_minutes=online_window_minutes,
+            )
