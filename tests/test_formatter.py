@@ -100,6 +100,20 @@ class TestTableFormatter:
         # online / offline indicators
         assert "●" in output or "○" in output
 
+    def test_online_indicator_uses_connected_to_control(self):
+        # The Tailscale API exposes online state as ``connectedToControl``.
+        online = TableFormatter(color=False).format(
+            [{"hostname": "h1", "connectedToControl": True}], "devices"
+        )
+        offline = TableFormatter(color=False).format(
+            [{"hostname": "h2", "connectedToControl": False}], "devices"
+        )
+        missing = TableFormatter(color=False).format([{"hostname": "h3"}], "devices")
+        assert "●" in online
+        assert "○" in offline
+        # A device without the field is treated as offline, never online.
+        assert "●" not in missing
+
     def test_tags_shown(self, devices):
         output = TableFormatter(color=False).format(devices, "devices")
         assert "env-production" in output

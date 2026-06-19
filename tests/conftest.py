@@ -26,7 +26,7 @@ def devices():
             "user": "alice@example.com",
             "tags": ["tag:env-production", "tag:role-web"],
             "addresses": ["100.64.0.1"],
-            "online": True,
+            "connectedToControl": True,
             "lastSeen": "2024-01-15T10:30:00Z",
         },
         {
@@ -37,7 +37,7 @@ def devices():
             "user": "bob@example.com",
             "tags": ["tag:env-production", "tag:role-web"],
             "addresses": ["100.64.0.2"],
-            "online": True,
+            "connectedToControl": True,
             "lastSeen": "2024-01-15T11:00:00Z",
         },
         {
@@ -48,7 +48,7 @@ def devices():
             "user": "alice@example.com",
             "tags": ["tag:env-staging", "tag:role-api"],
             "addresses": ["100.64.0.3"],
-            "online": False,
+            "connectedToControl": False,
             "lastSeen": "2024-01-10T08:00:00Z",
         },
         {
@@ -59,7 +59,7 @@ def devices():
             "user": "carol@example.com",
             "tags": ["tag:env-production", "tag:role-db"],
             "addresses": ["100.64.0.4"],
-            "online": True,
+            "connectedToControl": True,
             "lastSeen": "2024-01-15T09:45:00Z",
         },
         {
@@ -70,7 +70,7 @@ def devices():
             "user": "alice@example.com",
             "tags": None,
             "addresses": ["100.64.0.5"],
-            "online": False,
+            "connectedToControl": False,
             "lastSeen": "2024-01-14T20:00:00Z",
         },
     ]

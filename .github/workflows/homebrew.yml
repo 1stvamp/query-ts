@@ -13,6 +13,6 @@ jobs:
         with:
           formula-name: query-ts
           homebrew-tap: 1stvamp/homebrew-tap
-          download-url: https://github.com/1stvamp/query-ts/archive/refs/tags/${{ github.ref_name }}.tar.gz
+          download-url: https://codeload.github.com/1stvamp/query-ts/tar.gz/refs/tags/${{ github.ref_name }}
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -303,7 +303,7 @@ class TableFormatter(Formatter):
                 "online",
                 "Online",
                 lambda d: Text("●", style="green")
-                if d.get("online", False)
+                if d.get("connectedToControl", False)
                 else Text("○", style="red"),
                 justify="center",
                 droppable=False,
