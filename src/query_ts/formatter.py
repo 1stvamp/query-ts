@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+from collections.abc import Callable
+from dataclasses import dataclass
 from io import StringIO
 from typing import Any
 
@@ -82,23 +85,106 @@ class PlainFormatter(Formatter):
 # ---------------------------------------------------------------------------
 
 
-def _tag_str(tags: list | None) -> str:
-    if not tags:
-        return ""
-    return ", ".join(t[4:] if t.startswith("tag:") else t for t in tags)
-
-
 def _short_ts(ts: str) -> str:
     return ts[:16].replace("T", " ") if ts else ""
 
 
+def _tag_list(tags: list | None) -> list[str]:
+    if not tags:
+        return []
+    return [t[4:] if t.startswith("tag:") else t for t in tags]
+
+
+def _strip_domain(user: str) -> str:
+    return user.split("@", 1)[0] if "@" in user else user
+
+
+def _date_only(ts: str) -> str:
+    return ts[:10]
+
+
+def _term_width(fallback: int = 200) -> int:
+    return shutil.get_terminal_size((fallback, 24)).columns
+
+
+# Aliases so --show accepts intuitive names in addition to the canonical keys.
+_SHOW_ALIASES: dict[str, str] = {
+    "addresses": "ip",
+    "address": "ip",
+    "ips": "ip",
+    "ip-addresses": "ip",
+    "status": "online",
+    "state": "online",
+    "lastseen": "last-seen",
+    "seen": "last-seen",
+    "displayname": "display",
+    "loginname": "login",
+    "group": "name",
+}
+
+
+def _norm_show(tokens) -> set[str]:
+    out: set[str] = set()
+    for tok in tokens or ():
+        key = tok.strip().lower().replace("_", "-").replace(" ", "-")
+        if not key:
+            continue
+        out.add(_SHOW_ALIASES.get(key, key))
+    return out
+
+
+@dataclass
+class _Col:
+    """A responsive table column.
+
+    ``get`` returns the raw cell value: a ``str``/``Text`` for scalar columns
+    or a ``list[str]`` when ``is_list`` is set.
+    """
+
+    key: str
+    header: str
+    get: Callable[[dict], Any]
+    is_list: bool = False
+    no_wrap: bool = False
+    justify: str = "left"
+    style: str | None = None
+    droppable: bool = True
+    default: bool = True
+    shorten: Callable[[Any], Any] | None = None
+
+
+def _cell(col: _Col, raw: Any, stacked: bool, short: bool) -> Any:
+    if col.is_list:
+        items = list(raw or [])
+        if short:
+            if not items:
+                return ""
+            extra = len(items) - 1
+            return f"{items[0]}  +{extra}" if extra else items[0]
+        if stacked:
+            return "\n".join(items)
+        return ", ".join(items)
+    if short and col.shorten is not None:
+        return col.shorten(raw)
+    return raw
+
+
 class TableFormatter(Formatter):
-    def __init__(self, color: bool = True) -> None:
+    def __init__(
+        self,
+        color: bool = True,
+        width: int | None = None,
+        show: set[str] | None = None,
+    ) -> None:
         self.color = color
+        self.width = width if width is not None else _term_width()
+        self.forced = _norm_show(show)
 
     def _console(self) -> tuple[Console, StringIO]:
         buf = StringIO()
-        console = Console(file=buf, highlight=False, no_color=not self.color, width=200)
+        console = Console(
+            file=buf, highlight=False, no_color=not self.color, width=self.width
+        )
         return console, buf
 
     def format(self, resources: list[dict], resource_type: str) -> str:
@@ -112,76 +198,226 @@ class TableFormatter(Formatter):
         console.print(table)
         return buf.getvalue().rstrip()
 
+    def _responsive(
+        self,
+        cols: list[_Col],
+        rows: list[dict],
+        degrade: list[tuple[str, str]],
+    ) -> str:
+        """Render a table that adapts to ``self.width``.
+
+        Columns named in ``self.forced`` are always shown and never dropped or
+        value-shortened. Other columns degrade through ``degrade`` (an ordered
+        list of ``(action, key)`` steps) until the table fits the width: list
+        cells stack onto multiple lines, low-priority columns are dropped, and
+        scalar values are shortened, in that order of preference.
+        """
+        by_key = {c.key: c for c in cols}
+        modes = {
+            c.key: {
+                "dropped": not (c.default or c.key in self.forced),
+                "stacked": False,
+                "short": False,
+            }
+            for c in cols
+        }
+        console, buf = self._console()
+        # Console.measure clamps to its own width, so measure against an
+        # effectively unconstrained console to get the table's natural minimum
+        # (the width below which cells start to crop).
+        measure_console = Console(width=10_000)
+
+        def build() -> Table:
+            table = Table(
+                box=box.ROUNDED, show_header=True, header_style="bold cyan"
+            )
+            active = [c for c in cols if not modes[c.key]["dropped"]]
+            for c in active:
+                table.add_column(
+                    c.header, style=c.style, no_wrap=c.no_wrap, justify=c.justify
+                )
+            for row in rows:
+                table.add_row(
+                    *(
+                        _cell(
+                            c,
+                            c.get(row),
+                            modes[c.key]["stacked"],
+                            modes[c.key]["short"],
+                        )
+                        for c in active
+                    )
+                )
+            return table
+
+        table = build()
+        for action, key in degrade:
+            if measure_console.measure(table).minimum <= self.width:
+                break
+            if action in ("drop", "short") and key in self.forced:
+                continue
+            mode = modes.get(key)
+            col = by_key.get(key)
+            if mode is None or col is None:
+                continue
+            if action == "stack" and col.is_list:
+                mode["stacked"] = True
+            elif action == "short":
+                mode["short"] = True
+                mode["stacked"] = False
+            elif action == "drop" and col.droppable:
+                mode["dropped"] = True
+            else:
+                continue
+            table = build()
+
+        console.print(table)
+        return buf.getvalue().rstrip()
+
     def _fmt_devices(self, devices: list[dict]) -> str:
-        table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
-        table.add_column("Hostname", style="bold green", no_wrap=True)
-        table.add_column("OS")
-        table.add_column("User")
-        table.add_column("IP Addresses")
-        table.add_column("Tags")
-        table.add_column("St", justify="center")
-        table.add_column("Last Seen")
-
-        for d in devices:
-            name = d.get("hostname") or d.get("name", "")
-            os_name = d.get("os", "")
-            user = d.get("user", "")
-            addrs = ", ".join(d.get("addresses") or [])
-            tags = _tag_str(d.get("tags"))
-            online = d.get("online", False)
-            status = Text("●", style="green") if online else Text("○", style="red")
-            last_seen = _short_ts(d.get("lastSeen", ""))
-            table.add_row(name, os_name, user, addrs, tags, status, last_seen)
-
-        return self._render(table)
+        cols = [
+            _Col(
+                "hostname",
+                "Hostname",
+                lambda d: d.get("hostname") or d.get("name", ""),
+                no_wrap=True,
+                style="bold green",
+                droppable=False,
+            ),
+            _Col("os", "OS", lambda d: d.get("os", "")),
+            _Col("user", "User", lambda d: d.get("user", ""), shorten=_strip_domain),
+            _Col(
+                "ip",
+                "IP Addresses",
+                lambda d: list(d.get("addresses") or []),
+                is_list=True,
+            ),
+            _Col(
+                "tags",
+                "Tags",
+                lambda d: _tag_list(d.get("tags")),
+                is_list=True,
+                droppable=False,
+            ),
+            _Col(
+                "online",
+                "Online",
+                lambda d: Text("●", style="green")
+                if d.get("online", False)
+                else Text("○", style="red"),
+                justify="center",
+                droppable=False,
+            ),
+            _Col(
+                "last-seen",
+                "Last Seen",
+                lambda d: _short_ts(d.get("lastSeen", "")),
+                shorten=_date_only,
+                default=False,
+            ),
+        ]
+        degrade = [
+            ("stack", "ip"),
+            ("stack", "tags"),
+            ("drop", "os"),
+            ("short", "user"),
+            ("short", "last-seen"),
+            ("drop", "ip"),
+            ("short", "tags"),
+            ("drop", "user"),
+        ]
+        return self._responsive(cols, devices, degrade)
 
     def _fmt_users(self, users: list[dict]) -> str:
-        table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
-        table.add_column("Login", style="bold green", no_wrap=True)
-        table.add_column("Display Name")
-        table.add_column("Role")
-        table.add_column("Status")
-        table.add_column("Created")
-
-        for u in users:
-            login = u.get("loginName", u.get("name", ""))
-            display = u.get("displayName", "")
-            role = u.get("role", "")
-            status = u.get("status", "")
-            created = _short_ts(u.get("created", ""))
-            table.add_row(login, display, role, status, created)
-
-        return self._render(table)
+        cols = [
+            _Col(
+                "login",
+                "Login",
+                lambda u: u.get("loginName", u.get("name", "")),
+                no_wrap=True,
+                style="bold green",
+                droppable=False,
+            ),
+            _Col("display", "Display Name", lambda u: u.get("displayName", "")),
+            _Col("role", "Role", lambda u: u.get("role", ""), droppable=False),
+            _Col("status", "Status", lambda u: u.get("status", "")),
+            _Col(
+                "created",
+                "Created",
+                lambda u: _short_ts(u.get("created", "")),
+                shorten=_date_only,
+            ),
+        ]
+        degrade = [
+            ("short", "created"),
+            ("drop", "created"),
+            ("drop", "display"),
+            ("drop", "status"),
+        ]
+        return self._responsive(cols, users, degrade)
 
     def _fmt_groups(self, groups: list[dict]) -> str:
-        table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
-        table.add_column("Group", style="bold green", no_wrap=True)
-        table.add_column("Members")
-
-        for g in groups:
-            name = g.get("name", "")
-            members = ", ".join(g.get("members") or [])
-            table.add_row(name, members)
-
-        return self._render(table)
+        cols = [
+            _Col(
+                "name",
+                "Group",
+                lambda g: g.get("name", ""),
+                no_wrap=True,
+                style="bold green",
+                droppable=False,
+            ),
+            _Col(
+                "members",
+                "Members",
+                lambda g: list(g.get("members") or []),
+                is_list=True,
+                droppable=False,
+            ),
+        ]
+        degrade = [("stack", "members"), ("short", "members")]
+        return self._responsive(cols, groups, degrade)
 
     def _fmt_services(self, services: list[dict]) -> str:
-        table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
-        table.add_column("Name", style="bold green", no_wrap=True)
-        table.add_column("Addresses")
-        table.add_column("Ports")
-        table.add_column("Tags")
-        table.add_column("Comment")
-
-        for s in services:
-            name = s.get("name", "")
-            addrs = ", ".join(s.get("addrs") or [])
-            ports = ", ".join(s.get("ports") or [])
-            tags = _tag_str(s.get("tags"))
-            comment = s.get("comment", "")
-            table.add_row(name, addrs, ports, tags, comment)
-
-        return self._render(table)
+        cols = [
+            _Col(
+                "name",
+                "Name",
+                lambda s: s.get("name", ""),
+                no_wrap=True,
+                style="bold green",
+                droppable=False,
+            ),
+            _Col(
+                "addrs",
+                "Addresses",
+                lambda s: list(s.get("addrs") or []),
+                is_list=True,
+            ),
+            _Col(
+                "ports",
+                "Ports",
+                lambda s: list(s.get("ports") or []),
+                is_list=True,
+                droppable=False,
+            ),
+            _Col(
+                "tags",
+                "Tags",
+                lambda s: _tag_list(s.get("tags")),
+                is_list=True,
+            ),
+            _Col("comment", "Comment", lambda s: s.get("comment", "")),
+        ]
+        degrade = [
+            ("stack", "addrs"),
+            ("stack", "ports"),
+            ("stack", "tags"),
+            ("drop", "comment"),
+            ("short", "addrs"),
+            ("drop", "tags"),
+            ("short", "ports"),
+        ]
+        return self._responsive(cols, services, degrade)
 
     def _fmt_acl(self, acl_items: list[dict]) -> str:
         table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
@@ -219,6 +455,8 @@ def make_formatter(
     separator: str = "\n",
     field: str | None = None,
     color: bool = True,
+    width: int | None = None,
+    show: set[str] | None = None,
 ) -> Formatter:
     match fmt:
         case "json":
@@ -228,4 +466,4 @@ def make_formatter(
         case "plain":
             return PlainFormatter(separator=separator, field=field)
         case _:
-            return TableFormatter(color=color)
+            return TableFormatter(color=color, width=width, show=show)

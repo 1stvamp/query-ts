@@ -168,6 +168,17 @@ def _validate_format(ctx: click.Context, param: click.Parameter, value: str) -> 
     metavar="FIELD",
     help="Field to extract in plain output (e.g. name, id).",
 )
+@click.option(
+    "--show",
+    "show_columns",
+    default="",
+    metavar="COLS",
+    help=(
+        "Comma-separated table columns to always show in full, e.g. "
+        "--show last-seen,tags. Adds off-by-default columns and exempts the "
+        "named ones from automatic column-dropping and value-shortening."
+    ),
+)
 # --- connection / auth ---
 @click.option(
     "-k",
@@ -216,6 +227,7 @@ def main(
     separator: str,
     comma: bool,
     field: str | None,
+    show_columns: str,
     api_key: str | None,
     oauth_client_id: str | None,
     oauth_client_secret: str | None,
@@ -273,7 +285,10 @@ def main(
     except ParseError as exc:
         raise click.ClickException(f"Query parse error: {exc}") from exc
 
-    formatter = make_formatter(fmt, separator=separator, field=field, color=color)
+    show = {tok for tok in show_columns.split(",") if tok.strip()}
+    formatter = make_formatter(
+        fmt, separator=separator, field=field, color=color, show=show
+    )
     output = formatter.format(results, resource_type)
     if output:
         click.echo(output)
