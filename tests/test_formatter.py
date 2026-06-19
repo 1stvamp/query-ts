@@ -152,6 +152,52 @@ class TestTableFormatter:
         assert isinstance(TableFormatter(color=False).format(devices, "devices"), str)
 
 
+class TestResponsiveTable:
+    def _max_line(self, output: str) -> int:
+        return max((len(line) for line in output.splitlines()), default=0)
+
+    def test_respects_narrow_width(self, devices):
+        out = TableFormatter(color=False, width=91).format(devices, "devices")
+        assert self._max_line(out) <= 91
+
+    def test_wide_width_keeps_all_columns(self, devices):
+        out = TableFormatter(color=False, width=200).format(devices, "devices")
+        assert "OS" in out
+        assert "IP Addresses" in out
+
+    def test_narrow_drops_low_priority_column(self, devices):
+        # OS is the first column dropped as width shrinks.
+        out = TableFormatter(color=False, width=70).format(devices, "devices")
+        assert "OS" not in out
+        # Hostname and Tags are never dropped.
+        assert "web-prod-1" in out
+        assert "env-production" in out
+
+    def test_narrow_shortens_user_to_local_part(self, devices):
+        out = TableFormatter(color=False, width=70).format(devices, "devices")
+        assert "alice@example.com" not in out
+        assert "@example.com" not in out
+
+    def test_show_adds_last_seen_column(self, devices):
+        out = TableFormatter(color=False, width=200, show={"last-seen"}).format(
+            devices, "devices"
+        )
+        assert "Last Seen" in out
+
+    def test_show_pins_column_against_shortening(self, devices):
+        # Forcing the user column keeps full emails even when narrow.
+        out = TableFormatter(color=False, width=70, show={"user"}).format(
+            devices, "devices"
+        )
+        assert "alice@example.com" in out
+
+    def test_show_accepts_aliases(self, devices):
+        out = TableFormatter(color=False, width=200, show={"lastseen"}).format(
+            devices, "devices"
+        )
+        assert "Last Seen" in out
+
+
 class TestMakeFormatter:
     def test_json(self):
         assert isinstance(make_formatter("json"), JsonFormatter)

@@ -3,6 +3,18 @@
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def clear_tailscale_env(monkeypatch):
+    """Isolate tests from any TAILSCALE_* credentials in the real environment."""
+    for var in (
+        "TAILSCALE_API_KEY",
+        "TAILSCALE_OAUTH_CLIENT_ID",
+        "TAILSCALE_OAUTH_CLIENT_SECRET",
+        "TAILSCALE_TAILNET",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def devices():
     return [

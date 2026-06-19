@@ -210,8 +210,23 @@ is chosen per resource type (hostname for devices, login for users).
 | Flag | Description |
 | --- | --- |
 | `--color / --no-color` | Force or disable colour output (auto-detected by default) |
+| `--show COLS` | Comma-separated table columns to always show in full (e.g. `--show last-seen,tags`) |
 | `--version` | Show the version and exit |
 | `-h, --help` | Show help and exit |
+
+### Responsive tables
+
+The default `table` output adapts to your terminal width. When space is tight it
+degrades gracefully: list columns (IP addresses, tags, members) wrap onto
+multiple lines first, then the lowest-priority columns are dropped, then long
+values are shortened (emails lose their domain, timestamps drop the time).
+`Hostname` and `Tags` are never dropped.
+
+For devices, `Last Seen` is hidden by default and the online state is shown as a
+coloured dot in the `Online` column. Use `--show last-seen` to add the timestamp
+column, or name any columns you always want kept in full, e.g.
+`--show ip,tags,last-seen`. Columns passed to `--show` are exempt from the
+automatic dropping and shortening.
 
 ## Development
 
